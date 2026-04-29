@@ -23,6 +23,9 @@
   var SOP_FILE_ID = "1Whm2ozWNrJaNwjq2_1JJ2-JdSaIAraCIMTjYwJhGtss";
   var DRIVE_MCP   = "https://drivemcp.googleapis.com/mcp/v1";
   var SESSION_KEY = "ag_copilot_v3";
+
+  // ── Replace this with your Cloudflare Worker URL after deploying ──
+  var PROXY_URL   = "https://ag-copilot-proxy.akinadeayodeji5.workers.dev";
   var BASE_SYSTEM = "You are AdGuardian Copilot, an internal AI assistant for Ad Guardians support agents. "
     + "Answer questions accurately based ONLY on the SOP knowledge base provided. "
     + "Never fabricate information. If not covered, say so and suggest escalating to Tim, Shane, or Wester.\n\n"
@@ -270,9 +273,9 @@
 
   window._agSend = function(t) { doSend(t); };
 
-  /* ── API call helper ── */
+  /* ── API call helper — routes through Cloudflare Worker proxy ── */
   function callAPI(payload) {
-    return fetch("https://api.anthropic.com/v1/messages", {
+    return fetch(PROXY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
@@ -346,7 +349,7 @@
     isBusy = true;
     renderBody();
 
-    fetch("https://api.anthropic.com/v1/messages", {
+    fetch(PROXY_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
