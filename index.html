@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AdGuardians Copilot Widget v3 Preview</title>
+<style>
+  body{margin:0;font-family:'Inter',system-ui,sans-serif;background:#1a1a1a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;}
+  .preview-label{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:8px 20px;font-size:12px;color:#aaa;letter-spacing:0.05em;}
+</style>
+</head>
+<body>
+<div class="preview-label">⬇ Click the shield icon at bottom-right to open the Copilot</div>
+
+<!-- ============================================================
+     ADGUARDIANS COPILOT WIDGET v3
+     Paste everything below into your website footer before </body>
+============================================================ -->
+<script>
+(function() {
+
+  var MINT        = "#4DFFC4";
+  var SOP_FILE_ID = "1Whm2ozWNrJaNwjq2_1JJ2-JdSaIAraCIMTjYwJhGtss";
+  var DRIVE_MCP   = "https://drivemcp.googleapis.com/mcp/v1";
+  var SESSION_KEY = "ag_copilot_v3";
+  var BASE_SYSTEM = "You are AdGuardian Copilot, an internal AI assistant for Ad Guardians support agents. "
+    + "Answer questions accurately based ONLY on the SOP knowledge base provided. "
+    + "Never fabricate information. If not covered, say so and suggest escalating to Tim, Shane, or Wester.\n\n"
+    + "Format every response:\n"
+    + "- **Bold** for key terms\n- Numbered lists for procedures\n- Bullet points for rules\n"
+    + "- ## headers for multiple topics\n- Tables using | pipe syntax for structured data\n\n";
+
+  /* ── State ── */
+  var isOpen    = false;
+  var sopStatus = "loading";
+  var cachedSys = null;
+  var messages  = [];
+  var isBusy    = false;
+  var dark      = true;
+
+  /* ── Styles ── */
+  var S = document.createElement("style");
+  S.textContent = ""
+    + "@keyframes ag-dot{0%,80%,100%{transform:translateY(0);opacity:.3}40%{transform:translateY(-4px);opacity:1}}"
+    + "@keyframes ag-spin{to{transform:rotate(360deg)}}"
+    + "@keyframes ag-up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}"
+    + "@keyframes ag-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.1)}}"
+    + "#ag-fab{position:fixed;bottom:28px;right:28px;width:58px;height:58px;border-radius:50%;background:#0d1a14;border:2px solid " + MINT + "88;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:99999;box-shadow:0 4px 24px rgba(77,255,196,0.25);transition:transform .2s,box-shadow .2s;}"
+    + "#ag-fab:hover{transform:scale(1.1);box-shadow:0 6px 32px rgba(77,255,196,0.4);}"
+    + "#ag-fab:hover #ag-tip{opacity:1;transform:translateY(0);}"
+    + "#ag-tip{position:absolute;bottom:68px;right:0;background:#0d1a14;border:1px solid " + MINT + "55;border-radius:10px;padding:8px 12px;font-size:12px;color:" + MINT + ";white-space:nowrap;opacity:0;transform:translateY(6px);transition:opacity .2s,transform .2s;pointer-events:none;font-family:Inter,system-ui,sans-serif;box-shadow:0 4px 16px rgba(0,0,0,0.4);}"
+    + "#ag-tip::after{content:'';position:absolute;bottom:-6px;right:18px;width:10px;height:10px;background:#0d1a14;border-right:1px solid " + MINT + "55;border-bottom:1px solid " + MINT + "55;transform:rotate(45deg);}"
+    + "#ag-notif{position:absolute;top:-4px;right:-4px;width:13px;height:13px;background:#e05555;border-radius:50%;border:2px solid #111;display:none;animation:ag-pulse 2s infinite;}"
+    + "#ag-win{position:fixed;bottom:100px;right:28px;width:380px;height:560px;display:flex;flex-direction:column;background:#0a0a0a;border:0.5px solid #1e1e1e;border-radius:16px;overflow:hidden;z-index:99998;box-shadow:0 16px 64px rgba(0,0,0,0.6);font-family:Inter,system-ui,sans-serif;animation:ag-up .25s ease;}"
+    + "#ag-win.light{background:#f2f2f2;border-color:#e0e0e0;}"
+    + "#ag-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#111;border-bottom:0.5px solid #1e1e1e;flex-shrink:0;}"
+    + "#ag-win.light #ag-hdr{background:#fff;border-bottom-color:#e0e0e0;}"
+    + "#ag-line{height:2px;background:linear-gradient(90deg," + MINT + "," + MINT + "88,transparent);flex-shrink:0;}"
+    + "#ag-body{flex:1;overflow-y:auto;padding:14px 12px 6px;}"
+    + "#ag-body::-webkit-scrollbar{width:3px;}"
+    + "#ag-body::-webkit-scrollbar-thumb{background:#2a2a2a;border-radius:3px;}"
+    + "#ag-win.light #ag-body::-webkit-scrollbar-thumb{background:#ccc;}"
+    + "#ag-footer{padding:8px 10px 12px;background:#111;border-top:0.5px solid #1e1e1e;flex-shrink:0;}"
+    + "#ag-win.light #ag-footer{background:#fff;border-top-color:#e0e0e0;}"
+    + "#ag-row{display:flex;gap:6px;align-items:flex-end;background:#0f0f0f;border:0.5px solid #2a2a2a;border-radius:10px;padding:6px 6px 6px 11px;transition:border-color .2s;}"
+    + "#ag-win.light #ag-row{background:#f7f7f7;border-color:#ccc;}"
+    + "#ag-ta{resize:none;outline:none;border:none;background:transparent;font-size:13px;color:#eee;line-height:1.6;min-height:20px;max-height:90px;overflow-y:auto;flex:1;font-family:inherit;}"
+    + "#ag-win.light #ag-ta{color:#111;}"
+    + "#ag-send{width:30px;height:30px;border-radius:8px;border:1px solid #2a2a2a;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;color:#3a3a3a;transition:all .15s;flex-shrink:0;}"
+    + "#ag-send.on{border-color:" + MINT + "88;background:rgba(77,255,196,0.1);color:" + MINT + ";}"
+    + "#ag-hint{font-size:10px;color:#3a3a3a;text-align:center;margin-top:4px;letter-spacing:.03em;}"
+    + "#ag-win.light #ag-hint{color:#bbb;}"
+    + ".ag-msg{display:flex;gap:8px;margin-bottom:14px;align-items:flex-start;}"
+    + ".ag-msg.u{flex-direction:row-reverse;}"
+    + ".ag-bbl{max-width:78%;padding:9px 12px;font-size:13px;line-height:1.65;word-break:break-word;}"
+    + ".ag-bbl.u{border-radius:13px 3px 13px 13px;background:rgba(77,255,196,0.08);border:0.5px solid " + MINT + "44;color:" + MINT + ";}"
+    + ".ag-bbl.b{border-radius:3px 13px 13px 13px;background:#161616;border:0.5px solid #2a2a2a;color:#d4d4d4;}"
+    + "#ag-win.light .ag-bbl.u{background:#e6fdf5;border-color:#a0e8cc;color:#0a5a38;}"
+    + "#ag-win.light .ag-bbl.b{background:#fff;border-color:#e0e0e0;color:#1a1a1a;}"
+    + ".ag-av{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;}"
+    + ".ag-av.u{background:#1a2a24;border:1.5px solid " + MINT + "55;color:" + MINT + ";}"
+    + ".ag-av.b{background:#0d1a14;border:1.5px solid " + MINT + "66;}"
+    + "#ag-win.light .ag-av.u{background:#d0f5e8;}"
+    + "#ag-win.light .ag-av.b{background:#e6fdf5;}"
+    + ".ag-sugs{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%;}"
+    + ".ag-sb{text-align:left;padding:9px 10px;cursor:pointer;font-size:11px;background:#0f0f0f;border:0.5px solid #1e1e1e;border-radius:8px;color:#666;line-height:1.5;transition:all .15s;font-family:inherit;}"
+    + ".ag-sb:hover{border-color:" + MINT + "55;color:" + MINT + ";background:rgba(77,255,196,0.06);}"
+    + "#ag-win.light .ag-sb{background:#f7f7f7;border-color:#e0e0e0;color:#888;}"
+    + ".ag-cb{background:transparent;border:none;cursor:pointer;color:#666;font-size:13px;padding:3px 5px;border-radius:4px;line-height:1;transition:color .15s;}"
+    + ".ag-cb:hover{color:" + MINT + ";}"
+    + ".ag-dots{display:flex;gap:4px;align-items:center;padding:2px 0;}"
+    + ".ag-dot{width:5px;height:5px;border-radius:50%;background:" + MINT + ";animation:ag-dot 1.3s infinite ease-in-out;}"
+    + "table.agt{width:100%;border-collapse:collapse;font-size:12px;margin:7px 0;display:block;overflow-x:auto;}"
+    + "table.agt th{padding:5px 9px;text-align:left;background:#0d1a14;border:0.5px solid #2a2a2a;color:" + MINT + ";font-size:11px;white-space:nowrap;}"
+    + "table.agt td{padding:5px 9px;border:0.5px solid #2a2a2a;color:#d4d4d4;line-height:1.5;vertical-align:top;}"
+    + "table.agt tr:nth-child(even) td{background:#111;}"
+    + "#ag-win.light table.agt th{background:#f0fdf8;border-color:#e0e0e0;}"
+    + "#ag-win.light table.agt td{border-color:#e0e0e0;color:#1a1a1a;}"
+    + "#ag-win.light table.agt tr:nth-child(even) td{background:#fafafa;}";
+  document.head.appendChild(S);
+
+  /* ── SVG Logo ── */
+  function logo(sz) {
+    sz = sz || 28;
+    return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 200 200" fill="none">'
+      +'<path d="M100 14L30 46V104C30 145 60 178 100 190C140 178 170 145 170 104V46L100 14Z" stroke="'+MINT+'" stroke-width="8" fill="none" stroke-linejoin="round"/>'
+      +'<path d="M100 38L52 62V100C52 130 72 155 100 165C128 155 148 130 148 100V62L100 38Z" stroke="'+MINT+'" stroke-width="5" fill="none" stroke-linejoin="round" opacity="0.5"/>'
+      +'<circle cx="100" cy="16" r="5" fill="'+MINT+'"/>'
+      +'<path d="M72 90L86 76L100 90L114 76L128 90" stroke="'+MINT+'" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>'
+      +'<path d="M72 108L86 94L100 108L114 94L128 108" stroke="'+MINT+'" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>'
+      +'<path d="M84 122L100 138L116 122" stroke="'+MINT+'" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>'
+      +'</svg>';
+  }
+
+  /* ── Markdown renderer ── */
+  function inline(s) {
+    return s
+      .replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight:600;color:'+MINT+'">$1</strong>')
+      .replace(/`(.+?)`/g, '<code style="font-family:monospace;font-size:11px;background:rgba(77,255,196,0.09);color:'+MINT+';padding:1px 4px;border-radius:3px;">$1</code>');
+  }
+
+  function md(text) {
+    var lines = text.split("\n"), out = "", i = 0;
+    while (i < lines.length) {
+      var l = lines[i];
+      if (l.startsWith("## "))  { out += '<p style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:'+MINT+';margin:13px 0 3px;opacity:.9;">'+l.slice(3)+'</p>'; i++; continue; }
+      if (l.startsWith("### ")) { out += '<p style="font-size:12px;font-weight:600;color:#eee;margin:9px 0 2px;">'+l.slice(4)+'</p>'; i++; continue; }
+      if (/^\s*\|.*\|\s*$/.test(l)) {
+        var rows = [];
+        while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { rows.push(lines[i]); i++; }
+        var sep = function(r) { return /^\s*\|[\s\-|:]+\|\s*$/.test(r); };
+        var spl = function(r) { return r.trim().replace(/^\||\|$/g,"").split("|").map(function(c){return c.trim();}); };
+        var hdr = null, bdy = [];
+        if (rows.length > 1 && sep(rows[1])) { hdr = spl(rows[0]); bdy = rows.slice(2).filter(function(r){return !sep(r);}).map(spl); }
+        else { bdy = rows.filter(function(r){return !sep(r);}).map(spl); }
+        out += '<table class="agt">';
+        if (hdr) { out += '<thead><tr>'; hdr.forEach(function(c){ out += '<th>'+inline(c)+'</th>'; }); out += '</tr></thead>'; }
+        out += '<tbody>';
+        bdy.forEach(function(row){ out += '<tr>'; row.forEach(function(c){ out += '<td>'+inline(c)+'</td>'; }); out += '</tr>'; });
+        out += '</tbody></table>';
+        continue;
+      }
+      if (/^\d+\. /.test(l)) {
+        out += '<ol style="margin:4px 0;padding-left:17px;font-size:13px;">';
+        while (i < lines.length && /^\d+\. /.test(lines[i])) { out += '<li style="padding:2px 0;line-height:1.6;">'+inline(lines[i].replace(/^\d+\. /,""))+'</li>'; i++; }
+        out += '</ol>'; continue;
+      }
+      if (l.startsWith("- ")) {
+        out += '<ul style="margin:4px 0;padding-left:15px;font-size:13px;list-style-type:disc;">';
+        while (i < lines.length && lines[i].startsWith("- ")) { out += '<li style="padding:2px 0;line-height:1.6;">'+inline(lines[i].slice(2))+'</li>'; i++; }
+        out += '</ul>'; continue;
+      }
+      if (l.trim() === "---") { out += '<hr style="border:none;border-top:0.5px solid #2a2a2a;margin:8px 0;"/>'; i++; continue; }
+      if (l.trim()) out += '<p style="margin:3px 0;line-height:1.65;font-size:13px;">'+inline(l)+'</p>';
+      i++;
+    }
+    return out;
+  }
+
+  /* ── Build DOM ── */
+  var fab = document.createElement("div"); fab.id = "ag-fab";
+  fab.innerHTML = logo(30)
+    + '<div id="ag-notif"></div>'
+    + '<div id="ag-tip">I\'m AdGuardian Copilot! Ask me anything.</div>';
+
+  var win = document.createElement("div"); win.id = "ag-win"; win.style.display = "none";
+  win.innerHTML = ''
+    + '<div id="ag-hdr">'
+    +   '<div style="display:flex;align-items:center;gap:8px;">'
+    +     '<div style="width:28px;height:28px;border-radius:50%;background:#0d1a14;border:1.5px solid '+MINT+'66;display:flex;align-items:center;justify-content:center;">'+logo(18)+'</div>'
+    +     '<div>'
+    +       '<div style="font-weight:700;font-size:13px;letter-spacing:.04em;color:#fff;">AD<span style="color:'+MINT+'">GUARDIANS</span></div>'
+    +       '<div style="display:flex;align-items:center;gap:4px;margin-top:1px;">'
+    +         '<div id="ag-sdot" style="width:6px;height:6px;border-radius:50%;background:#f5a623;animation:ag-spin 1s linear infinite;"></div>'
+    +         '<span id="ag-stxt" style="font-size:9px;color:#666;letter-spacing:.06em;text-transform:uppercase;">Loading SOPs…</span>'
+    +       '</div>'
+    +     '</div>'
+    +   '</div>'
+    +   '<div style="display:flex;align-items:center;gap:2px;">'
+    +     '<button class="ag-cb" id="ag-theme" title="Toggle theme">☀</button>'
+    +     '<button class="ag-cb" id="ag-min"   title="Minimize">─</button>'
+    +     '<button class="ag-cb" id="ag-cls"   title="Close">✕</button>'
+    +   '</div>'
+    + '</div>'
+    + '<div id="ag-line"></div>'
+    + '<div id="ag-body"></div>'
+    + '<div id="ag-footer">'
+    +   '<div id="ag-row">'
+    +     '<textarea id="ag-ta" rows="1" placeholder="Loading SOPs, please wait…" disabled style="resize:none;outline:none;border:none;background:transparent;font-size:13px;color:#eee;line-height:1.6;min-height:20px;max-height:90px;overflow-y:auto;flex:1;font-family:inherit;"></textarea>'
+    +     '<button id="ag-send" class="ag-send" disabled>↑</button>'
+    +   '</div>'
+    +   '<div id="ag-hint" style="font-size:10px;color:#3a3a3a;text-align:center;margin-top:4px;letter-spacing:.03em;">Enter to send · Shift+Enter for new line</div>'
+    + '</div>';
+
+  document.body.appendChild(fab);
+  document.body.appendChild(win);
+
+  /* ── Element refs ── */
+  var body  = document.getElementById("ag-body");
+  var ta    = document.getElementById("ag-ta");
+  var sBtn  = document.getElementById("ag-send");
+  var sdot  = document.getElementById("ag-sdot");
+  var stxt  = document.getElementById("ag-stxt");
+  var notif = document.getElementById("ag-notif");
+
+  var SUGGS = [
+    "How do I onboard a new client?",
+    "WH subscription plans & pricing?",
+    "How to process a USDT invoice?",
+    "Meta ad account not spending?",
+  ];
+
+  /* ── Helpers ── */
+  function setReady(src) {
+    sopStatus = src;
+    sdot.style.animation = "none";
+    sdot.style.background = MINT;
+    stxt.textContent = src === "cache" ? "COPILOT · CACHED" : "COPILOT · LIVE FROM DRIVE";
+    ta.disabled = false;
+    ta.placeholder = "Ask about SOPs, dashboard procedures, or Meta workflows…";
+    renderBody();
+  }
+
+  function setError(msg) {
+    sopStatus = "error";
+    sdot.style.animation = "none";
+    sdot.style.background = "#e05555";
+    stxt.textContent = "LOAD FAILED";
+    body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;padding:20px;text-align:center;">'
+      + '<p style="font-size:12px;color:#e05555;margin:0;">Failed to load SOPs.<br><span style="color:#666;font-size:11px;">' + (msg||"Please refresh the page.") + '</span></p>'
+      + '<button onclick="window.location.reload()" style="font-size:11px;padding:5px 14px;cursor:pointer;background:transparent;border:1px solid #e05555;border-radius:8px;color:#e05555;font-family:inherit;">Retry</button>'
+      + '</div>';
+  }
+
+  function setSend() {
+    if (ta.value.trim() && !isBusy && sopStatus !== "loading" && sopStatus !== "error") {
+      sBtn.classList.add("on"); sBtn.disabled = false;
+    } else {
+      sBtn.classList.remove("on"); sBtn.disabled = true;
+    }
+  }
+
+  function renderBody() {
+    if (messages.length === 0) {
+      body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;text-align:center;">'
+        + '<div>'
+        +   '<div style="display:inline-flex;align-items:center;justify-content:center;width:54px;height:54px;border-radius:50%;background:#0d1a14;border:1.5px solid '+MINT+'44;margin-bottom:10px;">'+logo(32)+'</div>'
+        +   '<div style="font-weight:700;font-size:15px;color:#fff;margin-bottom:4px;">AD<span style="color:'+MINT+'">GUARDIANS</span> <span style="font-weight:400;color:#666;">Copilot</span></div>'
+        +   '<div style="font-size:12px;color:#666;max-width:270px;line-height:1.6;margin:0 auto;">Ask anything about SOPs, dashboard procedures, or Meta workflows.</div>'
+        + '</div>'
+        + '<div class="ag-sugs">'
+        + SUGGS.map(function(s){ return '<button class="ag-sb" onclick="window._agSend(\''+s.replace(/'/g,"\\'")+'\')">' + s + '</button>'; }).join("")
+        + '</div></div>';
+      return;
+    }
+    var html = "";
+    messages.forEach(function(m) {
+      var u  = m.role === "user";
+      var av = '<div class="ag-av '+(u?"u":"b")+'">'+(u?"Y":logo(16))+'</div>';
+      var bb = '<div class="ag-bbl '+(u?"u":"b")+'">'
+        + (u ? m.content : (m.content
+            ? md(m.content)
+            : '<div class="ag-dots"><div class="ag-dot" style="animation-delay:0s"></div><div class="ag-dot" style="animation-delay:.18s"></div><div class="ag-dot" style="animation-delay:.36s"></div></div>'))
+        + '</div>';
+      html += '<div class="ag-msg '+(u?"u":"b")+'">'+(u ? bb+av : av+bb)+'</div>';
+    });
+    body.innerHTML = html;
+    body.scrollTop = body.scrollHeight;
+  }
+
+  window._agSend = function(t) { doSend(t); };
+
+  /* ── API call helper ── */
+  function callAPI(payload) {
+    return fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(function(r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    });
+  }
+
+  /* ── Load SOPs: sessionStorage → Anthropic API with Drive MCP ── */
+  function loadSOPs() {
+    /* 1. Check sessionStorage first — instant if cached */
+    try {
+      var hit = sessionStorage.getItem(SESSION_KEY);
+      if (hit) { cachedSys = hit; setReady("cache"); return; }
+    } catch(e) {}
+
+    /* 2. Fetch from Drive via Anthropic API + MCP, then compress */
+    body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;">'
+      + '<div style="width:32px;height:32px;border-radius:50%;border:2px solid '+MINT+'44;border-top-color:'+MINT+';animation:ag-spin .9s linear infinite;"></div>'
+      + '<p style="font-size:12px;color:#666;margin:0;">Loading SOPs from Google Drive…</p>'
+      + '<p style="font-size:10px;color:#444;margin:0;">Cached for this session once done</p>'
+      + '</div>';
+
+    callAPI({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 8000,
+      mcp_servers: [{ type: "url", url: DRIVE_MCP, name: "gdrive" }],
+      messages: [{
+        role: "user",
+        content: "Use the Google Drive MCP read_file_content tool to read the file with ID: "
+          + SOP_FILE_ID + ". Return only the plain text content of the file, nothing else."
+      }]
+    })
+    .then(function(d) {
+      if (!d || !d.content) throw new Error("Empty Drive response");
+      var raw = "";
+      for (var i = 0; i < d.content.length; i++) {
+        if (d.content[i].type === "mcp_tool_result" && d.content[i].content && d.content[i].content[0] && d.content[i].content[0].text) {
+          raw = d.content[i].content[0].text; break;
+        }
+        if (d.content[i].type === "text" && d.content[i].text) {
+          raw = d.content[i].text; break;
+        }
+      }
+      if (!raw) throw new Error("No content returned from Drive");
+      return raw;
+    })
+    .then(function(raw) {
+      cachedSys = BASE_SYSTEM
+        + "---\n\n## KNOWLEDGE BASE (FROM GOOGLE DRIVE)\n\n"
+        + raw
+        + "\n\n---\n\nAlways answer based strictly on the above. If outside documented procedures, escalate to Tim, Shane, or Wester.";
+      try { sessionStorage.setItem(SESSION_KEY, cachedSys); } catch(e) {}
+      setReady("drive");
+    })
+    .catch(function(e) {
+      console.error("AG Copilot load error:", e);
+      setError(e.message || "Check console for details.");
+    });
+  }
+
+  /* ── Send with streaming ── */
+  function doSend(txt) {
+    var q = (txt || ta.value).trim();
+    if (!q || isBusy || sopStatus === "loading" || sopStatus === "error") return;
+    ta.value = ""; ta.style.height = "auto"; setSend();
+    messages.push({ role: "user", content: q });
+    var ai = messages.length;
+    messages.push({ role: "assistant", content: "" });
+    isBusy = true;
+    renderBody();
+
+    fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514", max_tokens: 1000, stream: true,
+        system: cachedSys,
+        messages: messages.slice(0, -1).map(function(m) { return { role: m.role, content: m.content }; })
+      })
+    }).then(function(r) {
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      var reader = r.body.getReader(), dec = new TextDecoder(), acc = "";
+      function pump() {
+        return reader.read().then(function(res) {
+          if (res.done) { isBusy = false; setSend(); return; }
+          dec.decode(res.value, { stream: true }).split("\n").forEach(function(line) {
+            if (!line.startsWith("data: ")) return;
+            var data = line.slice(6).trim();
+            if (data === "[DONE]") return;
+            try {
+              var p = JSON.parse(data);
+              var t = p && p.delta && p.delta.text ? p.delta.text : "";
+              if (t) { acc += t; messages[ai].content = acc; renderBody(); }
+            } catch(e) {}
+          });
+          return pump();
+        });
+      }
+      return pump();
+    }).catch(function() {
+      messages[ai].content = "Connection error. Please try again.";
+      isBusy = false; setSend(); renderBody();
+    });
+  }
+
+  /* ── Open / close / minimize ── */
+  function openWin() {
+    isOpen = true;
+    win.style.display = "flex";
+    notif.style.display = "none";
+    if (sopStatus === "loading" && !cachedSys) loadSOPs();
+  }
+  function closeWin() { isOpen = false; win.style.display = "none"; }
+  function miniWin()  { isOpen = false; win.style.display = "none"; notif.style.display = "block"; }
+
+  /* ── Events ── */
+  fab.addEventListener("click", function() { isOpen ? closeWin() : openWin(); });
+  document.getElementById("ag-cls").addEventListener("click",   closeWin);
+  document.getElementById("ag-min").addEventListener("click",   miniWin);
+  document.getElementById("ag-theme").addEventListener("click", function() {
+    dark = !dark;
+    win.classList.toggle("light", !dark);
+    document.getElementById("ag-theme").textContent = dark ? "☀" : "🌙";
+  });
+  sBtn.addEventListener("click", function() { doSend(); });
+  ta.addEventListener("input", function() {
+    ta.style.height = "auto";
+    ta.style.height = Math.min(ta.scrollHeight, 90) + "px";
+    setSend();
+  });
+  ta.addEventListener("keydown", function(e) {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); doSend(); }
+  });
+  ta.addEventListener("focus", function() { document.getElementById("ag-row").style.borderColor = MINT + "55"; });
+  ta.addEventListener("blur",  function() { document.getElementById("ag-row").style.borderColor = dark ? "#2a2a2a" : "#ccc"; });
+
+  /* ── Boot ── */
+  renderBody();
+
+})();
+</script>
+<!-- ============================================================
+     END ADGUARDIANS COPILOT WIDGET v3
+============================================================ -->
+</body>
+</html>
