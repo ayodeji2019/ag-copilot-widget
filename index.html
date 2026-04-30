@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>AdGuardians Copilot Widget Preview</title>
+<title>AdGuardians Copilot Widget</title>
 <style>
   body{margin:0;font-family:'Inter',system-ui,sans-serif;background:#1a1a1a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;}
   .preview-label{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:8px 20px;font-size:12px;color:#aaa;letter-spacing:0.05em;}
@@ -14,28 +14,17 @@
 
 <!-- ============================================================
      ADGUARDIANS COPILOT WIDGET
-     Paste everything from here to the end comment into your
-     website footer, just before the closing </body> tag.
+     Paste everything from the opening <script> tag below to the
+     closing </script> tag into your website footer before </body>
 ============================================================ -->
 <script>
-(function() {
+(function () {
 
   /* ── Config ── */
   var MINT        = "#4DFFC4";
   var MODEL       = "claude-sonnet-4-6";
-  var SOP_FILE_ID = "1Whm2ozWNrJaNwjq2_1JJ2-JdSaIAraCIMTjYwJhGtss";
-  var DRIVE_MCP   = "https://drivemcp.googleapis.com/mcp/v1";
-  var SESSION_KEY = "ag_copilot_v3";
+  var SESSION_KEY = "ag_copilot_v4";
   var PROXY_URL   = "https://ag-copilot-proxy.akinadeayodeji5.workers.dev";
-  var BASE_SYSTEM = "You are AdGuardian Copilot, an internal AI assistant for Ad Guardians support agents. "
-    + "Answer questions accurately based ONLY on the SOP knowledge base provided. "
-    + "Never fabricate information. If not covered, say so and suggest escalating to Tim, Shane, or Wester.\n\n"
-    + "Format every response:\n"
-    + "- **Bold** for key terms\n"
-    + "- Numbered lists for procedures\n"
-    + "- Bullet points for rules\n"
-    + "- ## headers for multiple topics\n"
-    + "- Tables using | pipe syntax for structured data\n\n";
 
   /* ── State ── */
   var isOpen    = false;
@@ -145,49 +134,27 @@
         while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { rows.push(lines[i]); i++; }
         var isSep = function(r) { return /^\s*\|[\s\-|:]+\|\s*$/.test(r); };
         var splitR = function(r) { return r.trim().replace(/^\||\|$/g, "").split("|").map(function(c) { return c.trim(); }); };
-        var hdr = null;
-        var bdy = [];
-        if (rows.length > 1 && isSep(rows[1])) {
-          hdr = splitR(rows[0]);
-          bdy = rows.slice(2).filter(function(r) { return !isSep(r); }).map(splitR);
-        } else {
-          bdy = rows.filter(function(r) { return !isSep(r); }).map(splitR);
-        }
+        var hdr = null, bdy = [];
+        if (rows.length > 1 && isSep(rows[1])) { hdr = splitR(rows[0]); bdy = rows.slice(2).filter(function(r) { return !isSep(r); }).map(splitR); }
+        else { bdy = rows.filter(function(r) { return !isSep(r); }).map(splitR); }
         out += '<table class="agt">';
-        if (hdr) {
-          out += '<thead><tr>';
-          hdr.forEach(function(c) { out += '<th>' + inlineM(c) + '</th>'; });
-          out += '</tr></thead>';
-        }
+        if (hdr) { out += '<thead><tr>'; hdr.forEach(function(c) { out += '<th>' + inlineM(c) + '</th>'; }); out += '</tr></thead>'; }
         out += '<tbody>';
-        bdy.forEach(function(row) {
-          out += '<tr>';
-          row.forEach(function(c) { out += '<td>' + inlineM(c) + '</td>'; });
-          out += '</tr>';
-        });
+        bdy.forEach(function(row) { out += '<tr>'; row.forEach(function(c) { out += '<td>' + inlineM(c) + '</td>'; }); out += '</tr>'; });
         out += '</tbody></table>';
         continue;
       }
       if (/^\d+\. /.test(l)) {
         out += '<ol style="margin:4px 0;padding-left:17px;font-size:13px;">';
-        while (i < lines.length && /^\d+\. /.test(lines[i])) {
-          out += '<li style="padding:2px 0;line-height:1.6;">' + inlineM(lines[i].replace(/^\d+\. /, "")) + '</li>';
-          i++;
-        }
+        while (i < lines.length && /^\d+\. /.test(lines[i])) { out += '<li style="padding:2px 0;line-height:1.6;">' + inlineM(lines[i].replace(/^\d+\. /, "")) + '</li>'; i++; }
         out += '</ol>'; continue;
       }
       if (l.startsWith("- ")) {
         out += '<ul style="margin:4px 0;padding-left:15px;font-size:13px;list-style-type:disc;">';
-        while (i < lines.length && lines[i].startsWith("- ")) {
-          out += '<li style="padding:2px 0;line-height:1.6;">' + inlineM(lines[i].slice(2)) + '</li>';
-          i++;
-        }
+        while (i < lines.length && lines[i].startsWith("- ")) { out += '<li style="padding:2px 0;line-height:1.6;">' + inlineM(lines[i].slice(2)) + '</li>'; i++; }
         out += '</ul>'; continue;
       }
-      if (l.trim() === "---") {
-        out += '<hr style="border:none;border-top:0.5px solid #2a2a2a;margin:8px 0;"/>';
-        i++; continue;
-      }
+      if (l.trim() === "---") { out += '<hr style="border:none;border-top:0.5px solid #2a2a2a;margin:8px 0;"/>'; i++; continue; }
       if (l.trim()) out += '<p style="margin:3px 0;line-height:1.65;font-size:13px;">' + inlineM(l) + '</p>';
       i++;
     }
@@ -250,7 +217,7 @@
     "Meta ad account not spending?",
   ];
 
-  /* ── Status helpers ── */
+  /* ── Helpers ── */
   function setReady(src) {
     sopStatus = src;
     sdot.style.animation = "none";
@@ -280,7 +247,6 @@
     }
   }
 
-  /* ── Render messages ── */
   function renderBody() {
     if (messages.length === 0) {
       body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;text-align:center;">'
@@ -291,8 +257,7 @@
         + '</div>'
         + '<div class="ag-sugs">'
         + SUGGS.map(function(s) { return '<button class="ag-sb" onclick="window._agSend(\'' + s.replace(/'/g, "\\'") + '\')">' + s + '</button>'; }).join("")
-        + '</div>'
-        + '</div>';
+        + '</div></div>';
       return;
     }
     var html = "";
@@ -300,9 +265,7 @@
       var u  = m.role === "user";
       var av = '<div class="ag-av ' + (u ? "u" : "b") + '">' + (u ? "Y" : logo(16)) + '</div>';
       var bb = '<div class="ag-bbl ' + (u ? "u" : "b") + '">'
-        + (u ? m.content : (m.content
-            ? renderMD(m.content)
-            : '<div class="ag-dots"><div class="ag-dot" style="animation-delay:0s"></div><div class="ag-dot" style="animation-delay:.18s"></div><div class="ag-dot" style="animation-delay:.36s"></div></div>'))
+        + (u ? m.content : (m.content ? renderMD(m.content) : '<div class="ag-dots"><div class="ag-dot" style="animation-delay:0s"></div><div class="ag-dot" style="animation-delay:.18s"></div><div class="ag-dot" style="animation-delay:.36s"></div></div>'))
         + '</div>';
       html += '<div class="ag-msg ' + (u ? "u" : "b") + '">' + (u ? bb + av : av + bb) + '</div>';
     });
@@ -312,19 +275,7 @@
 
   window._agSend = function(t) { doSend(t); };
 
-  /* ── API call via proxy ── */
-  function callAPI(payload) {
-    return fetch(PROXY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    }).then(function(r) {
-      if (!r.ok) return r.text().then(function(t) { throw new Error("HTTP " + r.status + ": " + t); });
-      return r.json();
-    });
-  }
-
-  /* ── Load SOPs ── */
+  /* ── Load SOPs from Cloudflare Worker (fetches live from Google Drive) ── */
   function loadSOPs() {
     try {
       var hit = sessionStorage.getItem(SESSION_KEY);
@@ -337,33 +288,18 @@
       + '<p style="font-size:10px;color:#444;margin:0;">Cached for this session once done</p>'
       + '</div>';
 
-    callAPI({
-      model: MODEL,
-      max_tokens: 8000,
-      mcp_servers: [{ type: "url", url: DRIVE_MCP, name: "gdrive" }],
-      messages: [{
-        role: "user",
-        content: "Use the Google Drive MCP read_file_content tool to read the file with ID: "
-          + SOP_FILE_ID + ". Return only the plain text content of the file, nothing else."
-      }]
+    fetch(PROXY_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "load_sop" })
+    })
+    .then(function(r) {
+      if (!r.ok) return r.text().then(function(t) { throw new Error("HTTP " + r.status + ": " + t); });
+      return r.json();
     })
     .then(function(d) {
-      if (!d || !d.content) throw new Error("Empty Drive response");
-      var raw = "";
-      for (var i = 0; i < d.content.length; i++) {
-        var blk = d.content[i];
-        if (blk.type === "mcp_tool_result" && blk.content && blk.content[0] && blk.content[0].text) {
-          raw = blk.content[0].text; break;
-        }
-        if (blk.type === "text" && blk.text && blk.text.length > 100) {
-          raw = blk.text; break;
-        }
-      }
-      if (!raw) throw new Error("No SOP content returned from Drive");
-      cachedSys = BASE_SYSTEM
-        + "---\n\n## KNOWLEDGE BASE (FROM GOOGLE DRIVE)\n\n"
-        + raw
-        + "\n\n---\n\nAlways answer based strictly on the above. If outside documented procedures, escalate to Tim, Shane, or Wester.";
+      if (!d.system) throw new Error("No system prompt returned from Worker");
+      cachedSys = d.system;
       try { sessionStorage.setItem(SESSION_KEY, cachedSys); } catch(e) {}
       setReady("drive");
     })
@@ -388,10 +324,9 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1000,
-        stream: true,
-        system: cachedSys,
+        action:   "chat",
+        stream:   true,
+        system:   cachedSys,
         messages: messages.slice(0, -1).map(function(m) { return { role: m.role, content: m.content }; })
       })
     }).then(function(r) {
@@ -456,7 +391,7 @@
   /* ── Boot ── */
   renderBody();
 
-})();
+}());
 </script>
 <!-- ============================================================
      END ADGUARDIANS COPILOT WIDGET
