@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>AdGuardians Copilot Widget v3 Preview</title>
+<title>AdGuardians Copilot Widget Preview</title>
 <style>
   body{margin:0;font-family:'Inter',system-ui,sans-serif;background:#1a1a1a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;}
   .preview-label{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:20px;padding:8px 20px;font-size:12px;color:#aaa;letter-spacing:0.05em;}
@@ -13,24 +13,29 @@
 <div class="preview-label">⬇ Click the shield icon at bottom-right to open the Copilot</div>
 
 <!-- ============================================================
-     ADGUARDIANS COPILOT WIDGET v3
-     Paste everything below into your website footer before </body>
+     ADGUARDIANS COPILOT WIDGET
+     Paste everything from here to the end comment into your
+     website footer, just before the closing </body> tag.
 ============================================================ -->
 <script>
 (function() {
 
+  /* ── Config ── */
   var MINT        = "#4DFFC4";
+  var MODEL       = "claude-sonnet-4-6";
   var SOP_FILE_ID = "1Whm2ozWNrJaNwjq2_1JJ2-JdSaIAraCIMTjYwJhGtss";
   var DRIVE_MCP   = "https://drivemcp.googleapis.com/mcp/v1";
   var SESSION_KEY = "ag_copilot_v3";
-
   var PROXY_URL   = "https://ag-copilot-proxy.akinadeayodeji5.workers.dev";
   var BASE_SYSTEM = "You are AdGuardian Copilot, an internal AI assistant for Ad Guardians support agents. "
     + "Answer questions accurately based ONLY on the SOP knowledge base provided. "
     + "Never fabricate information. If not covered, say so and suggest escalating to Tim, Shane, or Wester.\n\n"
     + "Format every response:\n"
-    + "- **Bold** for key terms\n- Numbered lists for procedures\n- Bullet points for rules\n"
-    + "- ## headers for multiple topics\n- Tables using | pipe syntax for structured data\n\n";
+    + "- **Bold** for key terms\n"
+    + "- Numbered lists for procedures\n"
+    + "- Bullet points for rules\n"
+    + "- ## headers for multiple topics\n"
+    + "- Tables using | pipe syntax for structured data\n\n";
 
   /* ── State ── */
   var isOpen    = false;
@@ -104,91 +109,124 @@
   /* ── SVG Logo ── */
   function logo(sz) {
     sz = sz || 28;
-    return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 200 200" fill="none">'
-      +'<path d="M100 14L30 46V104C30 145 60 178 100 190C140 178 170 145 170 104V46L100 14Z" stroke="'+MINT+'" stroke-width="8" fill="none" stroke-linejoin="round"/>'
-      +'<path d="M100 38L52 62V100C52 130 72 155 100 165C128 155 148 130 148 100V62L100 38Z" stroke="'+MINT+'" stroke-width="5" fill="none" stroke-linejoin="round" opacity="0.5"/>'
-      +'<circle cx="100" cy="16" r="5" fill="'+MINT+'"/>'
-      +'<path d="M72 90L86 76L100 90L114 76L128 90" stroke="'+MINT+'" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>'
-      +'<path d="M72 108L86 94L100 108L114 94L128 108" stroke="'+MINT+'" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>'
-      +'<path d="M84 122L100 138L116 122" stroke="'+MINT+'" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>'
-      +'</svg>';
+    return '<svg width="' + sz + '" height="' + sz + '" viewBox="0 0 200 200" fill="none">'
+      + '<path d="M100 14L30 46V104C30 145 60 178 100 190C140 178 170 145 170 104V46L100 14Z" stroke="' + MINT + '" stroke-width="8" fill="none" stroke-linejoin="round"/>'
+      + '<path d="M100 38L52 62V100C52 130 72 155 100 165C128 155 148 130 148 100V62L100 38Z" stroke="' + MINT + '" stroke-width="5" fill="none" stroke-linejoin="round" opacity="0.5"/>'
+      + '<circle cx="100" cy="16" r="5" fill="' + MINT + '"/>'
+      + '<path d="M72 90L86 76L100 90L114 76L128 90" stroke="' + MINT + '" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="M72 108L86 94L100 108L114 94L128 108" stroke="' + MINT + '" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>'
+      + '<path d="M84 122L100 138L116 122" stroke="' + MINT + '" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.4"/>'
+      + '</svg>';
   }
 
   /* ── Markdown renderer ── */
-  function inline(s) {
+  function inlineM(s) {
     return s
-      .replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight:600;color:'+MINT+'">$1</strong>')
-      .replace(/`(.+?)`/g, '<code style="font-family:monospace;font-size:11px;background:rgba(77,255,196,0.09);color:'+MINT+';padding:1px 4px;border-radius:3px;">$1</code>');
+      .replace(/\*\*(.+?)\*\*/g, '<strong style="font-weight:600;color:' + MINT + '">$1</strong>')
+      .replace(/`(.+?)`/g, '<code style="font-family:monospace;font-size:11px;background:rgba(77,255,196,0.09);color:' + MINT + ';padding:1px 4px;border-radius:3px;">$1</code>');
   }
 
-  function md(text) {
-    var lines = text.split("\n"), out = "", i = 0;
+  function renderMD(text) {
+    var lines = text.split("\n");
+    var out = "";
+    var i = 0;
     while (i < lines.length) {
       var l = lines[i];
-      if (l.startsWith("## "))  { out += '<p style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:'+MINT+';margin:13px 0 3px;opacity:.9;">'+l.slice(3)+'</p>'; i++; continue; }
-      if (l.startsWith("### ")) { out += '<p style="font-size:12px;font-weight:600;color:#eee;margin:9px 0 2px;">'+l.slice(4)+'</p>'; i++; continue; }
+      if (l.startsWith("## ")) {
+        out += '<p style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:' + MINT + ';margin:13px 0 3px;opacity:.9;">' + l.slice(3) + '</p>';
+        i++; continue;
+      }
+      if (l.startsWith("### ")) {
+        out += '<p style="font-size:12px;font-weight:600;color:#eee;margin:9px 0 2px;">' + l.slice(4) + '</p>';
+        i++; continue;
+      }
       if (/^\s*\|.*\|\s*$/.test(l)) {
         var rows = [];
         while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) { rows.push(lines[i]); i++; }
-        var sep = function(r) { return /^\s*\|[\s\-|:]+\|\s*$/.test(r); };
-        var spl = function(r) { return r.trim().replace(/^\||\|$/g,"").split("|").map(function(c){return c.trim();}); };
-        var hdr = null, bdy = [];
-        if (rows.length > 1 && sep(rows[1])) { hdr = spl(rows[0]); bdy = rows.slice(2).filter(function(r){return !sep(r);}).map(spl); }
-        else { bdy = rows.filter(function(r){return !sep(r);}).map(spl); }
+        var isSep = function(r) { return /^\s*\|[\s\-|:]+\|\s*$/.test(r); };
+        var splitR = function(r) { return r.trim().replace(/^\||\|$/g, "").split("|").map(function(c) { return c.trim(); }); };
+        var hdr = null;
+        var bdy = [];
+        if (rows.length > 1 && isSep(rows[1])) {
+          hdr = splitR(rows[0]);
+          bdy = rows.slice(2).filter(function(r) { return !isSep(r); }).map(splitR);
+        } else {
+          bdy = rows.filter(function(r) { return !isSep(r); }).map(splitR);
+        }
         out += '<table class="agt">';
-        if (hdr) { out += '<thead><tr>'; hdr.forEach(function(c){ out += '<th>'+inline(c)+'</th>'; }); out += '</tr></thead>'; }
+        if (hdr) {
+          out += '<thead><tr>';
+          hdr.forEach(function(c) { out += '<th>' + inlineM(c) + '</th>'; });
+          out += '</tr></thead>';
+        }
         out += '<tbody>';
-        bdy.forEach(function(row){ out += '<tr>'; row.forEach(function(c){ out += '<td>'+inline(c)+'</td>'; }); out += '</tr>'; });
+        bdy.forEach(function(row) {
+          out += '<tr>';
+          row.forEach(function(c) { out += '<td>' + inlineM(c) + '</td>'; });
+          out += '</tr>';
+        });
         out += '</tbody></table>';
         continue;
       }
       if (/^\d+\. /.test(l)) {
         out += '<ol style="margin:4px 0;padding-left:17px;font-size:13px;">';
-        while (i < lines.length && /^\d+\. /.test(lines[i])) { out += '<li style="padding:2px 0;line-height:1.6;">'+inline(lines[i].replace(/^\d+\. /,""))+'</li>'; i++; }
+        while (i < lines.length && /^\d+\. /.test(lines[i])) {
+          out += '<li style="padding:2px 0;line-height:1.6;">' + inlineM(lines[i].replace(/^\d+\. /, "")) + '</li>';
+          i++;
+        }
         out += '</ol>'; continue;
       }
       if (l.startsWith("- ")) {
         out += '<ul style="margin:4px 0;padding-left:15px;font-size:13px;list-style-type:disc;">';
-        while (i < lines.length && lines[i].startsWith("- ")) { out += '<li style="padding:2px 0;line-height:1.6;">'+inline(lines[i].slice(2))+'</li>'; i++; }
+        while (i < lines.length && lines[i].startsWith("- ")) {
+          out += '<li style="padding:2px 0;line-height:1.6;">' + inlineM(lines[i].slice(2)) + '</li>';
+          i++;
+        }
         out += '</ul>'; continue;
       }
-      if (l.trim() === "---") { out += '<hr style="border:none;border-top:0.5px solid #2a2a2a;margin:8px 0;"/>'; i++; continue; }
-      if (l.trim()) out += '<p style="margin:3px 0;line-height:1.65;font-size:13px;">'+inline(l)+'</p>';
+      if (l.trim() === "---") {
+        out += '<hr style="border:none;border-top:0.5px solid #2a2a2a;margin:8px 0;"/>';
+        i++; continue;
+      }
+      if (l.trim()) out += '<p style="margin:3px 0;line-height:1.65;font-size:13px;">' + inlineM(l) + '</p>';
       i++;
     }
     return out;
   }
 
   /* ── Build DOM ── */
-  var fab = document.createElement("div"); fab.id = "ag-fab";
+  var fab = document.createElement("div");
+  fab.id = "ag-fab";
   fab.innerHTML = logo(30)
     + '<div id="ag-notif"></div>'
     + '<div id="ag-tip">I\'m AdGuardian Copilot! Ask me anything.</div>';
 
-  var win = document.createElement("div"); win.id = "ag-win"; win.style.display = "none";
+  var win = document.createElement("div");
+  win.id = "ag-win";
+  win.style.display = "none";
   win.innerHTML = ''
     + '<div id="ag-hdr">'
     +   '<div style="display:flex;align-items:center;gap:8px;">'
-    +     '<div style="width:28px;height:28px;border-radius:50%;background:#0d1a14;border:1.5px solid '+MINT+'66;display:flex;align-items:center;justify-content:center;">'+logo(18)+'</div>'
+    +     '<div style="width:28px;height:28px;border-radius:50%;background:#0d1a14;border:1.5px solid ' + MINT + '66;display:flex;align-items:center;justify-content:center;">' + logo(18) + '</div>'
     +     '<div>'
-    +       '<div style="font-weight:700;font-size:13px;letter-spacing:.04em;color:#fff;">AD<span style="color:'+MINT+'">GUARDIANS</span></div>'
+    +       '<div style="font-weight:700;font-size:13px;letter-spacing:.04em;color:#fff;">AD<span style="color:' + MINT + '">GUARDIANS</span></div>'
     +       '<div style="display:flex;align-items:center;gap:4px;margin-top:1px;">'
     +         '<div id="ag-sdot" style="width:6px;height:6px;border-radius:50%;background:#f5a623;animation:ag-spin 1s linear infinite;"></div>'
-    +         '<span id="ag-stxt" style="font-size:9px;color:#666;letter-spacing:.06em;text-transform:uppercase;">Loading SOPs…</span>'
+    +         '<span id="ag-stxt" style="font-size:9px;color:#666;letter-spacing:.06em;text-transform:uppercase;">Loading SOPs...</span>'
     +       '</div>'
     +     '</div>'
     +   '</div>'
     +   '<div style="display:flex;align-items:center;gap:2px;">'
     +     '<button class="ag-cb" id="ag-theme" title="Toggle theme">☀</button>'
-    +     '<button class="ag-cb" id="ag-min"   title="Minimize">─</button>'
-    +     '<button class="ag-cb" id="ag-cls"   title="Close">✕</button>'
+    +     '<button class="ag-cb" id="ag-min" title="Minimize">─</button>'
+    +     '<button class="ag-cb" id="ag-cls" title="Close">✕</button>'
     +   '</div>'
     + '</div>'
     + '<div id="ag-line"></div>'
     + '<div id="ag-body"></div>'
     + '<div id="ag-footer">'
     +   '<div id="ag-row">'
-    +     '<textarea id="ag-ta" rows="1" placeholder="Loading SOPs, please wait…" disabled style="resize:none;outline:none;border:none;background:transparent;font-size:13px;color:#eee;line-height:1.6;min-height:20px;max-height:90px;overflow-y:auto;flex:1;font-family:inherit;"></textarea>'
+    +     '<textarea id="ag-ta" rows="1" placeholder="Loading SOPs, please wait..." disabled style="resize:none;outline:none;border:none;background:transparent;font-size:13px;color:#eee;line-height:1.6;min-height:20px;max-height:90px;overflow-y:auto;flex:1;font-family:inherit;"></textarea>'
     +     '<button id="ag-send" class="ag-send" disabled>↑</button>'
     +   '</div>'
     +   '<div id="ag-hint" style="font-size:10px;color:#3a3a3a;text-align:center;margin-top:4px;letter-spacing:.03em;">Enter to send · Shift+Enter for new line</div>'
@@ -207,19 +245,19 @@
 
   var SUGGS = [
     "How do I onboard a new client?",
-    "WH subscription plans & pricing?",
+    "WH subscription plans and pricing?",
     "How to process a USDT invoice?",
     "Meta ad account not spending?",
   ];
 
-  /* ── Helpers ── */
+  /* ── Status helpers ── */
   function setReady(src) {
     sopStatus = src;
     sdot.style.animation = "none";
     sdot.style.background = MINT;
     stxt.textContent = src === "cache" ? "COPILOT · CACHED" : "COPILOT · LIVE FROM DRIVE";
     ta.disabled = false;
-    ta.placeholder = "Ask about SOPs, dashboard procedures, or Meta workflows…";
+    ta.placeholder = "Ask about SOPs, dashboard procedures, or Meta workflows...";
     renderBody();
   }
 
@@ -229,7 +267,7 @@
     sdot.style.background = "#e05555";
     stxt.textContent = "LOAD FAILED";
     body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;padding:20px;text-align:center;">'
-      + '<p style="font-size:12px;color:#e05555;margin:0;">Failed to load SOPs.<br><span style="color:#666;font-size:11px;">' + (msg||"Please refresh the page.") + '</span></p>'
+      + '<p style="font-size:12px;color:#e05555;margin:0;">Failed to load SOPs.<br><span style="color:#666;font-size:11px;">' + (msg || "Please refresh the page.") + '</span></p>'
       + '<button onclick="window.location.reload()" style="font-size:11px;padding:5px 14px;cursor:pointer;background:transparent;border:1px solid #e05555;border-radius:8px;color:#e05555;font-family:inherit;">Retry</button>'
       + '</div>';
   }
@@ -242,29 +280,31 @@
     }
   }
 
+  /* ── Render messages ── */
   function renderBody() {
     if (messages.length === 0) {
       body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;text-align:center;">'
         + '<div>'
-        +   '<div style="display:inline-flex;align-items:center;justify-content:center;width:54px;height:54px;border-radius:50%;background:#0d1a14;border:1.5px solid '+MINT+'44;margin-bottom:10px;">'+logo(32)+'</div>'
-        +   '<div style="font-weight:700;font-size:15px;color:#fff;margin-bottom:4px;">AD<span style="color:'+MINT+'">GUARDIANS</span> <span style="font-weight:400;color:#666;">Copilot</span></div>'
+        +   '<div style="display:inline-flex;align-items:center;justify-content:center;width:54px;height:54px;border-radius:50%;background:#0d1a14;border:1.5px solid ' + MINT + '44;margin-bottom:10px;">' + logo(32) + '</div>'
+        +   '<div style="font-weight:700;font-size:15px;color:#fff;margin-bottom:4px;">AD<span style="color:' + MINT + '">GUARDIANS</span> <span style="font-weight:400;color:#666;">Copilot</span></div>'
         +   '<div style="font-size:12px;color:#666;max-width:270px;line-height:1.6;margin:0 auto;">Ask anything about SOPs, dashboard procedures, or Meta workflows.</div>'
         + '</div>'
         + '<div class="ag-sugs">'
-        + SUGGS.map(function(s){ return '<button class="ag-sb" onclick="window._agSend(\''+s.replace(/'/g,"\\'")+'\')">' + s + '</button>'; }).join("")
-        + '</div></div>';
+        + SUGGS.map(function(s) { return '<button class="ag-sb" onclick="window._agSend(\'' + s.replace(/'/g, "\\'") + '\')">' + s + '</button>'; }).join("")
+        + '</div>'
+        + '</div>';
       return;
     }
     var html = "";
     messages.forEach(function(m) {
       var u  = m.role === "user";
-      var av = '<div class="ag-av '+(u?"u":"b")+'">'+(u?"Y":logo(16))+'</div>';
-      var bb = '<div class="ag-bbl '+(u?"u":"b")+'">'
+      var av = '<div class="ag-av ' + (u ? "u" : "b") + '">' + (u ? "Y" : logo(16)) + '</div>';
+      var bb = '<div class="ag-bbl ' + (u ? "u" : "b") + '">'
         + (u ? m.content : (m.content
-            ? md(m.content)
+            ? renderMD(m.content)
             : '<div class="ag-dots"><div class="ag-dot" style="animation-delay:0s"></div><div class="ag-dot" style="animation-delay:.18s"></div><div class="ag-dot" style="animation-delay:.36s"></div></div>'))
         + '</div>';
-      html += '<div class="ag-msg '+(u?"u":"b")+'">'+(u ? bb+av : av+bb)+'</div>';
+      html += '<div class="ag-msg ' + (u ? "u" : "b") + '">' + (u ? bb + av : av + bb) + '</div>';
     });
     body.innerHTML = html;
     body.scrollTop = body.scrollHeight;
@@ -272,7 +312,7 @@
 
   window._agSend = function(t) { doSend(t); };
 
-  /* ── API call helper — routes through Cloudflare Worker proxy ── */
+  /* ── API call via proxy ── */
   function callAPI(payload) {
     return fetch(PROXY_URL, {
       method: "POST",
@@ -284,24 +324,21 @@
     });
   }
 
-  /* ── Load SOPs: sessionStorage → proxy → Drive MCP ── */
+  /* ── Load SOPs ── */
   function loadSOPs() {
-    /* 1. Check sessionStorage first */
     try {
       var hit = sessionStorage.getItem(SESSION_KEY);
       if (hit) { cachedSys = hit; setReady("cache"); return; }
     } catch(e) {}
 
-    /* 2. Show loading spinner */
     body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;">'
       + '<div style="width:32px;height:32px;border-radius:50%;border:2px solid ' + MINT + '44;border-top-color:' + MINT + ';animation:ag-spin .9s linear infinite;"></div>'
-      + '<p style="font-size:12px;color:#666;margin:0;">Loading SOPs from Google Drive…</p>'
+      + '<p style="font-size:12px;color:#666;margin:0;">Loading SOPs from Google Drive...</p>'
       + '<p style="font-size:10px;color:#444;margin:0;">Cached for this session once done</p>'
       + '</div>';
 
-    /* 3. Fetch Drive file via MCP */
     callAPI({
-      model: "claude-sonnet-4-20250514",
+      model: MODEL,
       max_tokens: 8000,
       mcp_servers: [{ type: "url", url: DRIVE_MCP, name: "gdrive" }],
       messages: [{
@@ -351,13 +388,17 @@
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514", max_tokens: 1000, stream: true,
+        model: MODEL,
+        max_tokens: 1000,
+        stream: true,
         system: cachedSys,
         messages: messages.slice(0, -1).map(function(m) { return { role: m.role, content: m.content }; })
       })
     }).then(function(r) {
       if (!r.ok) throw new Error("HTTP " + r.status);
-      var reader = r.body.getReader(), dec = new TextDecoder(), acc = "";
+      var reader = r.body.getReader();
+      var dec = new TextDecoder();
+      var acc = "";
       function pump() {
         return reader.read().then(function(res) {
           if (res.done) { isBusy = false; setSend(); return; }
@@ -393,8 +434,8 @@
 
   /* ── Events ── */
   fab.addEventListener("click", function() { isOpen ? closeWin() : openWin(); });
-  document.getElementById("ag-cls").addEventListener("click",   closeWin);
-  document.getElementById("ag-min").addEventListener("click",   miniWin);
+  document.getElementById("ag-cls").addEventListener("click", closeWin);
+  document.getElementById("ag-min").addEventListener("click", miniWin);
   document.getElementById("ag-theme").addEventListener("click", function() {
     dark = !dark;
     win.classList.toggle("light", !dark);
@@ -418,7 +459,7 @@
 })();
 </script>
 <!-- ============================================================
-     END ADGUARDIANS COPILOT WIDGET v3
+     END ADGUARDIANS COPILOT WIDGET
 ============================================================ -->
 </body>
 </html>
