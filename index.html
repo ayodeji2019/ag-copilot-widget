@@ -24,7 +24,6 @@
   var DRIVE_MCP   = "https://drivemcp.googleapis.com/mcp/v1";
   var SESSION_KEY = "ag_copilot_v3";
 
-  // ── Replace this with your Cloudflare Worker URL after deploying ──
   var PROXY_URL   = "https://ag-copilot-proxy.akinadeayodeji5.workers.dev";
   var BASE_SYSTEM = "You are AdGuardian Copilot, an internal AI assistant for Ad Guardians support agents. "
     + "Answer questions accurately based ONLY on the SOP knowledge base provided. "
@@ -280,26 +279,27 @@
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload)
     }).then(function(r) {
-      if (!r.ok) throw new Error("HTTP " + r.status);
+      if (!r.ok) return r.text().then(function(t) { throw new Error("HTTP " + r.status + ": " + t); });
       return r.json();
     });
   }
 
-  /* ── Load SOPs: sessionStorage → Anthropic API with Drive MCP ── */
+  /* ── Load SOPs: sessionStorage → proxy → Drive MCP ── */
   function loadSOPs() {
-    /* 1. Check sessionStorage first — instant if cached */
+    /* 1. Check sessionStorage first */
     try {
       var hit = sessionStorage.getItem(SESSION_KEY);
       if (hit) { cachedSys = hit; setReady("cache"); return; }
     } catch(e) {}
 
-    /* 2. Fetch from Drive via Anthropic API + MCP, then compress */
+    /* 2. Show loading spinner */
     body.innerHTML = '<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;">'
-      + '<div style="width:32px;height:32px;border-radius:50%;border:2px solid '+MINT+'44;border-top-color:'+MINT+';animation:ag-spin .9s linear infinite;"></div>'
+      + '<div style="width:32px;height:32px;border-radius:50%;border:2px solid ' + MINT + '44;border-top-color:' + MINT + ';animation:ag-spin .9s linear infinite;"></div>'
       + '<p style="font-size:12px;color:#666;margin:0;">Loading SOPs from Google Drive…</p>'
       + '<p style="font-size:10px;color:#444;margin:0;">Cached for this session once done</p>'
       + '</div>';
 
+    /* 3. Fetch Drive file via MCP */
     callAPI({
       model: "claude-sonnet-4-20250514",
       max_tokens: 8000,
@@ -314,17 +314,15 @@
       if (!d || !d.content) throw new Error("Empty Drive response");
       var raw = "";
       for (var i = 0; i < d.content.length; i++) {
-        if (d.content[i].type === "mcp_tool_result" && d.content[i].content && d.content[i].content[0] && d.content[i].content[0].text) {
-          raw = d.content[i].content[0].text; break;
+        var blk = d.content[i];
+        if (blk.type === "mcp_tool_result" && blk.content && blk.content[0] && blk.content[0].text) {
+          raw = blk.content[0].text; break;
         }
-        if (d.content[i].type === "text" && d.content[i].text) {
-          raw = d.content[i].text; break;
+        if (blk.type === "text" && blk.text && blk.text.length > 100) {
+          raw = blk.text; break;
         }
       }
-      if (!raw) throw new Error("No content returned from Drive");
-      return raw;
-    })
-    .then(function(raw) {
+      if (!raw) throw new Error("No SOP content returned from Drive");
       cachedSys = BASE_SYSTEM
         + "---\n\n## KNOWLEDGE BASE (FROM GOOGLE DRIVE)\n\n"
         + raw
